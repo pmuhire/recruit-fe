@@ -1,16 +1,66 @@
 "use client"
-import Card from "../../components/Card"
+
+import { useState } from "react"
 
 export default function RegisterPage() {
+
+  const [form, setForm] = useState({
+    username:"",
+    email:"",
+    password:""
+  })
+
+  const handleChange = (e:any) => {
+    setForm({...form, [e.target.name]: e.target.value})
+  }
+
+  const handleSubmit = (e:any) => {
+    e.preventDefault()
+    console.log(form)
+  }
+
   return (
-    <div className="flex justify-center items-center h-screen">
-      <Card title="Login">
-        <form className="flex flex-col gap-3">
-          <input type="email" placeholder="Email" className="border p-2 rounded"/>
-          <input type="password" placeholder="Password" className="border p-2 rounded"/>
-          <button className="bg-blue-600 text-white p-2 rounded">Login</button>
-        </form>
-      </Card>
+    <div className="min-h-screen flex justify-center items-center bg-gray-100">
+
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white p-8 rounded shadow-md w-full max-w-md"
+      >
+
+        <h2 className="text-2xl font-bold mb-6 text-center">
+          Create Account
+        </h2>
+
+        <input
+          name="username"
+          placeholder="Username"
+          onChange={handleChange}
+          className="w-full border p-2 mb-4 rounded"
+        />
+
+        <input
+          name="email"
+          placeholder="Email"
+          onChange={handleChange}
+          className="w-full border p-2 mb-4 rounded"
+        />
+
+        <input
+          type="password"
+          name="password"
+          placeholder="Password"
+          onChange={handleChange}
+          className="w-full border p-2 mb-6 rounded"
+        />
+
+        <button
+          className="w-full bg-blue-600 text-white p-2 rounded"
+        >
+          Register
+        </button>
+
+      </form>
+
     </div>
   )
 }

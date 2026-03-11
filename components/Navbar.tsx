@@ -1,17 +1,17 @@
-"use client"
+"use client";
 
-interface NavbarProps {
-  currentUser: { name: string; role: string }
-}
+import { Menu } from "lucide-react";
 
-export default function Navbar({ currentUser }: NavbarProps) {
+export default function Navbar({ openSidebar }: any) {
   return (
-    <nav className="bg-white shadow-md h-16 flex items-center px-6 justify-between">
-      <div className="text-xl font-bold text-blue-600">Recruitment System</div>
-      <div className="flex items-center gap-4">
-        <span className="text-gray-700">Hi, {currentUser.name} ({currentUser.role})</span>
-        <button className="text-gray-700 hover:text-blue-600">Logout</button>
-      </div>
-    </nav>
-  )
+    <div className="bg-white border-b border-gray-200 p-4 flex justify-between items-center">
+      <button onClick={openSidebar} className="md:hidden">
+        <Menu size={26} />
+      </button>
+
+      <h1 className="font-bold text-lg">Recruitment System</h1>
+
+      <div>User</div>
+    </div>
+  );
 }
