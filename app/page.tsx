@@ -1,46 +1,108 @@
-"use client"
+"use client";
 
-import Link from "next/link"
+import { useEffect, useState } from "react";
+import Link from "next/link";
 
-export default function HomePage() {
+interface Job {
+  id: number;
+  title: string;
+  department: string;
+  status: "Open" | "Closed";
+}
 
-  const isLoggedIn = true // Simulate login state
+export default function LandingPage() {
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [filter, setFilter] = useState<"All" | "Open" | "Closed">("All");
 
-  if (isLoggedIn) {
-    // Redirect or show dashboard placeholder
-    return <p>Redirecting to dashboard...</p>
-  }
+  useEffect(() => {
+    const fetchJobs = async () => {
+      try {
+        const res = await fetch("/api/jobs");
+        const data = await res.json();
+        setJobs(data);
+      } catch {
+        // Dummy data if API fails
+        setJobs([
+          { id: 1, title: "Software Engineer", department: "Engineering", status: "Open" },
+          { id: 2, title: "Backend Developer", department: "Engineering", status: "Open" },
+          { id: 3, title: "UI/UX Designer", department: "Design", status: "Closed" },
+          { id: 4, title: "Cyber Security Analyst", department: "Security", status: "Open" },
+          { id: 5, title: "DevOps Engineer", department: "Infrastructure", status: "Closed" },
+          { id: 6, title: "Data Analyst", department: "Data", status: "Open" },
+        ]);
+      }
+    };
 
-  // Landing page for unauthenticated users
+    fetchJobs();
+  }, []);
+
+  // Filter jobs based on selected filter
+  const filteredJobs = jobs.filter((job) =>
+    filter === "All" ? true : job.status === filter
+  );
+
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col justify-center items-center text-center px-6">
+    <div className="max-w-6xl mx-auto py-4 px-4">
+      {/* Page title */}
+      <h1 className="text-3xl font-bold mb-4 text-gray-800">Available Jobs</h1>
 
-      <h1 className="text-5xl font-bold text-blue-600 mb-6">
-        Welcome to the Recruitment System
-      </h1>
-
-      <p className="text-lg text-gray-700 mb-8 max-w-xl">
-        Submit your profile, attach your CV, and track your applications. HR and Admin can manage applications and monitor recruitment statistics.
-      </p>
-
-      <div className="flex justify-center gap-4">
-        <Link href="/login">
-          <button className="bg-blue-600 text-white font-semibold px-6 py-3 rounded shadow hover:bg-blue-700">
-            Login
+      {/* Filter Buttons */}
+      <div className="flex gap-3 mb-6">
+        {(["All", "Open", "Closed"] as const).map((status) => (
+          <button
+            key={status}
+            className={`px-4 py-2 rounded-md font-medium transition ${
+              filter === status
+                ? "bg-[#4B5320] text-white"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
+            onClick={() => setFilter(status)}
+          >
+            {status}
           </button>
-        </Link>
-
-        <Link href="/register">
-          <button className="border border-blue-600 text-blue-600 font-semibold px-6 py-3 rounded hover:bg-blue-50">
-            Register
-          </button>
-        </Link>
+        ))}
       </div>
 
-      <footer className="text-gray-500 text-sm mt-12">
-        © 2026 Recruitment System. All rights reserved.
-      </footer>
+      {/* Job cards */}
+      <div className="grid md:grid-cols-3 gap-6">
+        {filteredJobs.map((job) => (
+          <div
+            key={job.id}
+            className="p-5 border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition bg-white"
+          >
+            <h2 className="text-xl font-semibold text-gray-800">{job.title}</h2>
+            <p className="text-gray-500 mt-1">{job.department}</p>
 
+            {/* Status */}
+            <p
+              className={`mt-2 font-medium ${
+                job.status === "Open" ? "text-[#4B5320]" : "text-gray-500"
+              }`}
+            >
+              {job.status}
+            </p>
+
+            {/* Apply Button */}
+            <Link
+              href={job.status === "Open" ? `/jobs/${job.id}/` : "#"}
+              className={`mt-4 block text-center py-2 rounded-md font-medium transition ${
+                job.status === "Open"
+                  ? "bg-[#4B5320] text-white hover:bg-[#3f461c]"
+                  : "bg-gray-300 text-gray-600 cursor-not-allowed"
+              }`}
+            >
+              Apply
+            </Link>
+          </div>
+        ))}
+
+        {/* Message if no jobs */}
+        {filteredJobs.length === 0 && (
+          <p className="col-span-full text-center text-gray-500">
+            No jobs found for "{filter}"
+          </p>
+        )}
+      </div>
     </div>
-  )
+  );
 }
