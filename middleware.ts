@@ -34,7 +34,7 @@ export const config = {
     "/dashboard/:path*",
     "/applicant/:path*",
     "/users/:path*",
-    "/jobs/:path*",
+    "/jobs/",
     "/candidates/:path*",
   ],
 };
