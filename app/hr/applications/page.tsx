@@ -4,39 +4,37 @@ import { useState, useEffect, useMemo } from "react";
 import Sidebar from "@/components/Sidebar";
 import Card from "@/components/ui/Card";
 import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
+
+interface User {
+  id: number;
+  username: string;
+  email?: string;
+  role?: string;
+}
 
 interface Application {
   id: number;
-  userId: number;
+  user: User; // full user object
   jobId: number;
   jobTitle: string;
   status: "APPROVED" | "REJECTED" | "PENDING";
   reviewReason?: string;
   submittedAt: string;
+  documents?: { id: number; fileName: string; fileUrl: string }[];
 }
 
-interface User {
-  id: number;
-  username: string; // API returns username
-  email?: string;
-  role?: string;
-}
-
-// Review / Decide Modal
-import { useRouter } from "next/navigation";
-
+// Review Modal
 function ReviewModal({
   isOpen,
   onClose,
   onSubmit,
   application,
-  user,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (status: "APPROVED" | "REJECTED", reason: string) => void;
   application: Application | null;
-  user: User | null;
 }) {
   const [decision, setDecision] = useState<"APPROVED" | "REJECTED">("APPROVED");
   const [reason, setReason] = useState("");
@@ -53,53 +51,41 @@ function ReviewModal({
 
   if (!isOpen || !application) return null;
 
-  const handleSubmit = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      // Call the onSubmit function passed as prop
-      await onSubmit(decision, reason);
-
-      // Close the modal after submission
-      onClose();
-      setLoading(false);
-    } catch (err) {
-      setLoading(false);
-      setError("Unable to submit review. Please try again.");
-    }
-  };
-
   const handleApprovalOrRejection = async () => {
+    if (!application) return;
+
     setLoading(true);
     setError("");
 
     try {
-      console.log(decision)
-      // Send approval or rejection decision to backend
+      // Hardcoded endpoint depending on decision
+      const endpoint =
+        decision === "APPROVED"
+          ? `/api/applications/${application.id}/approve`
+          : `/api/applications/${application.id}/reject`;
+
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/applications/${application.id}/${decision.toLowerCase()}`,
+        `${process.env.NEXT_PUBLIC_API_URL}${endpoint}`,
         {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`, // JWT token for authentication
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ reviewReason: reason }),
-        }
+        },
       );
 
       const data = await response.json();
-      console.log(data)
 
       if (data.success) {
         alert(`${decision} successful`);
-        // Redirect to appropriate page if necessary
-        router.push("/hr/dashboard"); // Modify this based on where you want to redirect
+        onSubmit(decision, reason);
+        onClose();
       } else {
         setError(data.message || "Something went wrong!");
       }
-    } catch (error) {
+    } catch (err) {
       setError("Error communicating with the server.");
     } finally {
       setLoading(false);
@@ -111,16 +97,16 @@ function ReviewModal({
       <div className="bg-white rounded-lg shadow p-6 w-full max-w-lg overflow-y-auto max-h-[90vh]">
         <h2 className="text-xl font-bold mb-4">Review Application</h2>
 
+        {/* Applicant Info */}
         <div className="mb-4 space-y-1">
           <p>
             <span className="font-semibold">Applicant:</span>{" "}
-            {user?.email || "Unknown"}
+            {application.user.username}
           </p>
-          {user?.email && (
-            <p>
-              <span className="font-semibold">Email:</span> {user.email}
-            </p>
-          )}
+          <p>
+            <span className="font-semibold">Email:</span>{" "}
+            {application.user.email}
+          </p>
           <p>
             <span className="font-semibold">Job:</span> {application.jobTitle}
           </p>
@@ -134,6 +120,32 @@ function ReviewModal({
           </p>
         </div>
 
+        {/* Documents / CV */}
+        {application.documents && application.documents.length > 0 && (
+          <div className="mb-4">
+            <h3 className="font-semibold mb-2">Documents</h3>
+            <ul className="space-y-2">
+              {application.documents.map((doc) => (
+                <li
+                  key={doc.id}
+                  className="flex justify-between items-center border p-2 rounded"
+                >
+                  <span>{doc.fileName}</span>
+                  <a
+                    href={doc.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
+                  >
+                    View / Download
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Decision */}
         <div className="flex flex-col gap-3 mb-4">
           <select
             className="border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
@@ -180,10 +192,11 @@ function ReviewModal({
     </div>
   );
 }
+
+// Main Page
 export default function PendingApplicationsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [applications, setApplications] = useState<Application[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedApplication, setSelectedApplication] =
     useState<Application | null>(null);
@@ -193,14 +206,13 @@ export default function PendingApplicationsPage() {
 
   const { token, role } = useAuth();
 
-  // Fetch applications
   const fetchApplications = async () => {
     try {
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/applications`,
         {
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
       const data = await res.json();
       setApplications(data.data || []);
@@ -209,84 +221,35 @@ export default function PendingApplicationsPage() {
     }
   };
 
-  // Fetch all users
-  const fetchUsers = async () => {
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/users`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      setUsers(data.data || []);
-    } catch (err) {
-      console.error("Failed to fetch users", err);
-    }
-  };
-
   useEffect(() => {
     if (role !== "HR") return;
     fetchApplications();
-    fetchUsers();
   }, [role]);
 
-  // Map users for fast lookup
-  const userMap = useMemo(() => {
-    const map: Record<number, User> = {};
-    users.forEach((u) => {
-      map[Number(u.id)] = u;
-    });
-    return map;
-  }, [users]);
-
-  // Filter applications based on selected filter and text for summary cards
+  // Filter for summary cards only
   const filteredApplications = useMemo(() => {
     return applications.filter((app) => {
-      const user = userMap[app.userId];
       let filterValue = "";
 
-      if (selectedFilter === "jobTitle") {
-        filterValue = app.jobTitle || ""; // Ensure no null or undefined
-      } else if (selectedFilter === "applicant") {
-        filterValue = user?.username || ""; // Ensure no null or undefined
-      } else if (selectedFilter === "status") {
-        filterValue = app.status || ""; // Ensure no null or undefined
-      }
+      if (selectedFilter === "jobTitle") filterValue = app.jobTitle || "";
+      else if (selectedFilter === "applicant")
+        filterValue = app.user.username || "";
+      else if (selectedFilter === "status") filterValue = app.status || "";
 
-      // Prevent calling toLowerCase on null or undefined
       return filterValue.toLowerCase().includes(filterText.toLowerCase());
     });
-  }, [applications, filterText, selectedFilter, userMap]);
+  }, [applications, filterText, selectedFilter]);
 
-  const handleDecide = async (
-    status: "APPROVED" | "REJECTED",
-    reason: string
-  ) => {
+  const handleDecide = (status: "APPROVED" | "REJECTED", reason: string) => {
     if (!selectedApplication) return;
-
-    try {
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/applications/${selectedApplication.id}/decide`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ status, reason }),
-        }
-      );
-
-      setApplications(
-        applications.map((a) =>
-          a.id === selectedApplication.id
-            ? { ...a, status, reviewReason: reason }
-            : a
-        )
-      );
-      setModalOpen(false);
-      setSelectedApplication(null);
-    } catch (err) {
-      console.error("Failed to update application", err);
-    }
+    setApplications(
+      applications.map((a) =>
+        a.id === selectedApplication.id
+          ? { ...a, status, reviewReason: reason }
+          : a,
+      ),
+    );
+    setSelectedApplication(null);
   };
 
   return (
@@ -298,7 +261,7 @@ export default function PendingApplicationsPage() {
       <div className="flex-1 p-6">
         <h1 className="text-3xl font-bold mb-6">Applications</h1>
 
-        {/* Filter Dropdown and Input */}
+        {/* Filter */}
         <div className="flex mb-6 gap-4">
           <select
             className="p-2 border rounded"
@@ -322,25 +285,25 @@ export default function PendingApplicationsPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           <Card
             title="Total Pending"
-            value={filteredApplications.filter(
-              (app) => app.status === "PENDING"
-            ).length.toString()}
+            value={filteredApplications
+              .filter((a) => a.status === "PENDING")
+              .length.toString()}
           />
           <Card
             title="Total APPROVED"
-            value={filteredApplications.filter(
-              (app) => app.status === "APPROVED"
-            ).length.toString()}
+            value={filteredApplications
+              .filter((a) => a.status === "APPROVED")
+              .length.toString()}
           />
           <Card
             title="Total REJECTED"
-            value={filteredApplications.filter(
-              (app) => app.status === "REJECTED"
-            ).length.toString()}
+            value={filteredApplications
+              .filter((a) => a.status === "REJECTED")
+              .length.toString()}
           />
         </div>
 
-        {/* Applications Table (All Applications) */}
+        {/* Table */}
         <div className="bg-white rounded-lg shadow p-4 overflow-x-auto">
           <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden">
             <thead>
@@ -363,62 +326,55 @@ export default function PendingApplicationsPage() {
                 </tr>
               )}
 
-              {applications.map((app, idx) => {
-                const user = userMap[Number(app.userId)];
-                return (
-                  <tr
-                    key={app.id}
-                    className="border-t hover:bg-gray-50 transition"
-                  >
-                    <td className="p-3 font-medium">{idx + 1}</td>
-                    <td className="p-3 font-semibold text-gray-800">
-                      {user?.username || "Unknown"}
-                    </td>
-                    <td className="p-3">{app.jobTitle}</td>
-                    <td className="p-3 text-sm text-gray-600">
-                      {user?.email || "N/A"}
-                    </td>
-                    <td className="p-3">
-                      <span
-                        className={`px-2 py-1 text-xs rounded ${
-                          app.status === "PENDING"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : app.status === "APPROVED"
+              {applications.map((app, idx) => (
+                <tr
+                  key={app.id}
+                  className="border-t hover:bg-gray-50 transition"
+                >
+                  <td className="p-3 font-medium">{idx + 1}</td>
+                  <td className="p-3 font-semibold text-gray-800">
+                    {app.user.username}
+                  </td>
+                  <td className="p-3">{app.jobTitle}</td>
+                  <td className="p-3 text-sm text-gray-600">
+                    {app.user.email || "N/A"}
+                  </td>
+                  <td className="p-3">
+                    <span
+                      className={`px-2 py-1 text-xs rounded ${
+                        app.status === "PENDING"
+                          ? "bg-yellow-100 text-yellow-700"
+                          : app.status === "APPROVED"
                             ? "bg-green-100 text-green-700"
                             : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {app.status}
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      <button
-                        className="px-3 py-1 rounded text-white text-sm hover:opacity-90 transition"
-                        style={{ backgroundColor: "#4B5320" }}
-                        onClick={() => {
-                          setSelectedApplication(app);
-                          setModalOpen(true);
-                        }}
-                      >
-                        Review
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+                      }`}
+                    >
+                      {app.status}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    <button
+                      className="px-3 py-1 rounded text-white text-sm hover:opacity-90 transition"
+                      style={{ backgroundColor: "#4B5320" }}
+                      onClick={() => {
+                        setSelectedApplication(app);
+                        setModalOpen(true);
+                      }}
+                    >
+                      Review
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
 
-        {/* Review Modal */}
         <ReviewModal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
           onSubmit={handleDecide}
           application={selectedApplication}
-          user={
-            selectedApplication ? userMap[Number(selectedApplication.userId)] || null : null
-          }
         />
       </div>
     </div>
