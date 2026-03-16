@@ -17,11 +17,11 @@ import {
 
 import Card from "@/components/ui/Card";
 import Sidebar from "@/components/Sidebar";
+import { useAuth } from "@/context/AuthContext";
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
-  BarElement,
   BarElement,
   PointElement,
   LineElement,
@@ -34,100 +34,80 @@ ChartJS.register(
 interface Job {
   id: number;
   title: string;
+  description: string;
   department: string;
-  status: "Open" | "Closed";
+  location: string;
+  status: "OPEN" | "CLOSED";
   createdAt: string;
+  updatedAt?: string;
 }
 
 interface Application {
   id: number;
   jobTitle: string;
   applicant: string;
-  status: "Approved" | "Rejected" | "Pending";
-  appliedAt: string; // for chart over time
+  status: "APPROVED" | "REJECTED" | "PENDING";
+  appliedAt: string; // for chart
 }
+
 const chartOptions = {
   plugins: { legend: { display: false }, tooltip: { enabled: true } },
   maintainAspectRatio: false,
 };
+
 export default function HRDashboard() {
+  const { token } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const dummyJobs: Job[] = [
-      {
-        id: 1,
-        title: "Frontend Developer",
-        department: "IT",
-        status: "Open",
-        createdAt: "2026-03-01",
-      },
-      {
-        id: 2,
-        title: "Backend Developer",
-        department: "IT",
-        status: "Closed",
-        createdAt: "2026-03-05",
-      },
-      {
-        id: 3,
-        title: "UI/UX Designer",
-        department: "Design",
-        status: "Open",
-        createdAt: "2026-03-08",
-      },
-    ];
-    setJobs(dummyJobs);
+    const fetchDashboardData = async () => {
+      if (!token) return;
+      try {
+        // Fetch Jobs
+        const jobsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/jobs/all`);
+        const jobsData = await jobsRes.json();
+        setJobs(jobsData.data || []);
 
-    const dummyApplications: Application[] = [
-      {
-        id: 1,
-        jobTitle: "Frontend Developer",
-        applicant: "Alice",
-        status: "Approved",
-        appliedAt: "2026-03-02",
-      },
-      {
-        id: 2,
-        jobTitle: "Backend Developer",
-        applicant: "Bob",
-        status: "Rejected",
-        appliedAt: "2026-03-06",
-      },
-      {
-        id: 3,
-        jobTitle: "UI/UX Designer",
-        applicant: "Charlie",
-        status: "Pending",
-        appliedAt: "2026-03-09",
-      },
-      {
-        id: 4,
-        jobTitle: "Frontend Developer",
-        applicant: "David",
-        status: "Approved",
-        appliedAt: "2026-03-10",
-      },
-    ];
-    setApplications(dummyApplications);
-  }, []);
+        // Fetch Applications
+        const appsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/applications`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const appsData = await appsRes.json();
+        setApplications(appsData.data || []);
+
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+        setJobs([]);
+        setApplications([]);
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [token]);
+
+  if (loading) return <p className="p-6">Loading dashboard...</p>;
+
+  // Ensure arrays are always defined
+  const jobsList = jobs || [];
+  const applicationsList = applications || [];
 
   // Job stats
-  const totalJobs = jobs.length;
-  const openJobs = jobs.filter((j) => j.status === "Open").length;
-  const closedJobs = jobs.filter((j) => j.status === "Closed").length;
+  const totalJobs = jobsList.length;
+  const openJobs = jobsList.filter((j) => j.status === "OPEN").length;
+  const closedJobs = jobsList.filter((j) => j.status === "CLOSED").length;
 
   // Application stats
-  const totalApplications = applications.length;
-  const approvedApps = applications.filter(
-    (a) => a.status === "Approved",
-  ).length;
-  const rejectedApps = applications.filter(
-    (a) => a.status === "Rejected",
-  ).length;
-  const pendingApps = applications.filter((a) => a.status === "Pending").length;
+  const totalApplications = applicationsList.length;
+  const APPROVEDApps = applicationsList.filter((a) => a.status === "APPROVED").length;
+  const REJECTEDApps = applicationsList.filter((a) => a.status === "REJECTED").length;
+  const PENDINGApps = applicationsList.filter((a) => a.status === "PENDING").length;
 
   // Pie chart for jobs
   const jobsPieData = {
@@ -142,19 +122,18 @@ export default function HRDashboard() {
   };
 
   // Line chart for applications
-  const appsByDate = applications.reduce<
-    Record<string, { approved: number; rejected: number; pending: number }>
+  const appsByDate = applicationsList.reduce<
+    Record<string, { APPROVED: number; REJECTED: number; PENDING: number }>
   >((acc, app) => {
-    if (!acc[app.appliedAt])
-      acc[app.appliedAt] = { approved: 0, rejected: 0, pending: 0 };
+    if (!acc[app.appliedAt]) acc[app.appliedAt] = { APPROVED: 0, REJECTED: 0, PENDING: 0 };
     acc[app.appliedAt][
-      app.status.toLowerCase() as "approved" | "rejected" | "pending"
+      app.status.toLowerCase() as "APPROVED" | "REJECTED" | "PENDING"
     ] += 1;
     return acc;
   }, {});
 
   const appDates = Object.keys(appsByDate).sort(
-    (a, b) => new Date(a).getTime() - new Date(b).getTime(),
+    (a, b) => new Date(a).getTime() - new Date(b).getTime()
   );
 
   const appsLineData = {
@@ -162,21 +141,21 @@ export default function HRDashboard() {
     datasets: [
       {
         label: "Approved",
-        data: appDates.map((d) => appsByDate[d].approved),
+        data: appDates.map((d) => appsByDate[d].APPROVED),
         borderColor: "#4ade80",
         backgroundColor: "#4ade80",
         tension: 0.3,
       },
       {
         label: "Rejected",
-        data: appDates.map((d) => appsByDate[d].rejected),
+        data: appDates.map((d) => appsByDate[d].REJECTED),
         borderColor: "#f87171",
         backgroundColor: "#f87171",
         tension: 0.3,
       },
       {
         label: "Pending",
-        data: appDates.map((d) => appsByDate[d].pending),
+        data: appDates.map((d) => appsByDate[d].PENDING),
         borderColor: "#fbbf24",
         backgroundColor: "#fbbf24",
         tension: 0.3,
@@ -186,10 +165,7 @@ export default function HRDashboard() {
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <Sidebar
-        isOpen={sidebarOpen}
-        closeSidebar={() => setSidebarOpen(false)}
-      />
+      <Sidebar isOpen={sidebarOpen} closeSidebar={() => setSidebarOpen(false)} />
       <div className="flex-1 p-4 sm:p-6">
         <h1 className="text-3xl font-bold mb-6">HR Dashboard</h1>
 
@@ -198,33 +174,25 @@ export default function HRDashboard() {
           <Card title="Total Jobs" value={totalJobs.toString()} />
           <Card title="Open Jobs" value={openJobs.toString()} />
           <Card title="Closed Jobs" value={closedJobs.toString()} />
-          <Card
-            title="Total Applications"
-            value={totalApplications.toString()}
-          />
-          <Card title="Approved Applications" value={approvedApps.toString()} />
-          <Card title="Rejected Applications" value={rejectedApps.toString()} />
+          <Card title="Total Applications" value={totalApplications.toString()} />
+          <Card title="Approved Applications" value={APPROVEDApps.toString()} />
+          <Card title="Rejected Applications" value={REJECTEDApps.toString()} />
+          <Card title="Pending Applications" value={PENDINGApps.toString()} />
         </div>
 
+        {/* Charts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div className="bg-white rounded-lg shadow p-4 flex flex-col h-56 min-h-0">
             <h2 className="text-xl font-semibold mb-2">Jobs Status</h2>
             <div className="flex-1 min-h-0">
-              <Pie
-                data={jobsPieData}
-                options={chartOptions}
-                className="w-full h-full"
-              />
+              <Pie data={jobsPieData} options={chartOptions} className="w-full h-full" />
             </div>
           </div>
+
           <div className="bg-white rounded-lg shadow p-4 flex flex-col h-56 min-h-0">
             <h2 className="text-xl font-semibold mb-2">Applications Trend</h2>
             <div className="flex-1 min-h-0">
-              <Line
-                data={appsLineData}
-                options={chartOptions}
-                className="h-40 md:h-48"
-              />
+              <Line data={appsLineData} options={chartOptions} className="h-40 md:h-48" />
             </div>
           </div>
         </div>

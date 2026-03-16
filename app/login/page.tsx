@@ -1,28 +1,35 @@
 "use client";
 
-import { useState,useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext"; // Import the useAuth hook
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login } = useAuth(); // Get login function from context
+
   const [loadingRedirect, setLoadingRedirect] = useState(true);
   const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Prevent logged-in users from seeing login page
   useEffect(() => {
     const token = localStorage.getItem("token");
     const role = localStorage.getItem("role");
 
     if (token) {
-      // Redirect based on role
       switch (role) {
+        case "HR":
+          router.replace("/hr/dashboard");
+          break;
+
+        case "SUPERADMIN":
+          router.replace("/admin/dashboard");
+          break;
+
         case "APPLICANT":
-          router.replace("/");
-          break;
         case "USER":
-          router.replace("/");
-          break;
         default:
           router.replace("/");
       }
@@ -34,22 +41,22 @@ export default function LoginPage() {
   if (loadingRedirect) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p>Redirecting...</p>
+        <p>Checking session...</p>
       </div>
     );
   }
 
-  const handleChange = (e: any) =>
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+  };
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     setLoading(true);
     setError("");
 
     try {
-      console.log("LOGIN REQUEST:", form);
-
       const res = await fetch(
         "https://recruit-be-production.up.railway.app/auth/login",
         {
@@ -58,34 +65,40 @@ export default function LoginPage() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(form),
-        },
+        }
       );
 
       const data = await res.json();
-      console.log("LOGIN RESPONSE:", data);
 
       if (data.success) {
-        // Store token and role
+        // store auth data in context
+        login(data.token, data.role, data.username, data.userId); // Use context to set userId and other data
+        // store auth data in localStorage
         localStorage.setItem("token", data.token);
         if (data.username) localStorage.setItem("username", data.username);
         if (data.role) localStorage.setItem("role", data.role);
+        if (data.userId) localStorage.setItem("userId", data.userId);
 
-        // Redirect based on role
+        // redirect based on role
         switch (data.role) {
-          case "APPLICANT":
-            router.push("/");
+          case "HR":
+            router.push("/hr/dashboard");
             break;
+
           case "SUPERADMIN":
-            router.push("/");
+            router.push("/admin/dashboard");
             break;
+
+          case "APPLICANT":
+          case "USER":
           default:
-            router.push("/login");
+            router.push("/");
         }
       } else {
         setError(data.message || "Login failed");
       }
     } catch (err) {
-      console.error("LOGIN ERROR:", err);
+      console.error(err);
       setError("Unable to connect to server. Please try again.");
     }
 
@@ -95,6 +108,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-4">
       <div className="w-full max-w-md">
+
         <h1 className="text-center text-3xl font-bold mb-8 text-gray-800">
           E-Recruit
         </h1>
@@ -108,7 +122,7 @@ export default function LoginPage() {
           </h2>
 
           <div className="space-y-4">
-            {/* Error message */}
+
             {error && (
               <div className="bg-red-100 text-red-700 text-sm p-3 rounded-md">
                 {error}
@@ -140,6 +154,7 @@ export default function LoginPage() {
             >
               {loading ? "Logging in..." : "Login"}
             </button>
+
           </div>
         </form>
 
@@ -152,6 +167,7 @@ export default function LoginPage() {
             Sign up
           </span>
         </p>
+
       </div>
     </div>
   );

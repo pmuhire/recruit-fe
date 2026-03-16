@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 
 interface NavbarProps {
   openSidebar?: () => void;
@@ -11,51 +12,43 @@ interface NavbarProps {
 
 export default function Navbar({ openSidebar }: NavbarProps) {
   const router = useRouter();
+  const { token, role, username, logout } = useAuth();
 
-  const [role, setRole] = useState<string | null>(null);
-  const [username, setUsername] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isClient, setIsClient] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  useEffect(() => {
-    setIsClient(true);
-    setRole(localStorage.getItem("role"));
-    setUsername(localStorage.getItem("username"));
-    setToken(localStorage.getItem("token"));
-  }, []);
-
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("role");
-    localStorage.removeItem("username");
-
+    logout();
     router.push("/login");
   };
-
-  if (!isClient) return null;
 
   // Generate links based on role
   const getLinks = () => {
     if (!token) return [];
-    if (role === "APPLICANT")
+
+    if (role === "APPLICANT") {
       return [
         { href: "/jobs", label: "Jobs" },
         { href: "/applicant/applications", label: "My Applications" },
       ];
-    if (role === "HR")
+    }
+
+    if (role === "HR") {
       return [
         { href: "/dashboard", label: "Dashboard" },
         { href: "/jobs", label: "Jobs" },
         { href: "/applications", label: "Applications" },
       ];
-    if (role === "SUPERADMIN")
+    }
+
+    if (role === "SUPERADMIN") {
       return [
         { href: "/dashboard", label: "Dashboard" },
         { href: "/jobs", label: "Jobs" },
         { href: "/applications", label: "Applications" },
         { href: "/users", label: "Users" },
       ];
+    }
+
     return [];
   };
 
@@ -63,9 +56,10 @@ export default function Navbar({ openSidebar }: NavbarProps) {
 
   return (
     <nav className="bg-white border-b border-gray-200 shadow-sm px-4 py-3 md:px-6 flex justify-between items-center relative">
+
       {/* LEFT */}
       <div className="flex items-center gap-4">
-        {/* Sidebar toggle for HR/SUPERADMIN */}
+        {/* Sidebar toggle */}
         {openSidebar && role && role !== "APPLICANT" && (
           <button onClick={openSidebar} className="md:hidden">
             <Menu size={24} />
@@ -83,6 +77,7 @@ export default function Navbar({ openSidebar }: NavbarProps) {
 
       {/* DESKTOP LINKS */}
       <div className="hidden md:flex items-center gap-4">
+
         {links.map((link) => (
           <Link
             key={link.href}
@@ -110,7 +105,7 @@ export default function Navbar({ openSidebar }: NavbarProps) {
         )}
       </div>
 
-      {/* MOBILE HAMBURGER */}
+      {/* MOBILE BUTTON */}
       <div className="md:hidden flex items-center">
         <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
           {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -120,7 +115,9 @@ export default function Navbar({ openSidebar }: NavbarProps) {
       {/* MOBILE MENU */}
       {mobileMenuOpen && (
         <div className="absolute top-full left-0 w-full bg-white shadow-md border-t border-gray-200 md:hidden z-50">
+
           <div className="flex flex-col p-4 gap-2">
+
             {links.map((link) => (
               <Link
                 key={link.href}
@@ -147,7 +144,9 @@ export default function Navbar({ openSidebar }: NavbarProps) {
                 Login
               </button>
             )}
+
           </div>
+
         </div>
       )}
     </nav>

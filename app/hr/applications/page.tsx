@@ -1,88 +1,149 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Sidebar from "@/components/Sidebar";
 import Card from "@/components/ui/Card";
-
-interface Job {
-  id: number;
-  title: string;
-  description?: string;
-}
+import { useAuth } from "@/context/AuthContext";
 
 interface Application {
   id: number;
+  userId: number;
   jobId: number;
-  applicant: string;
-  status: "Approved" | "Rejected" | "Pending";
-  reason?: string;
-  email?: string;
-  phone?: string;
-  cvUrl?: string; // URL to the uploaded CV
+  jobTitle: string;
+  status: "APPROVED" | "REJECTED" | "PENDING";
+  reviewReason?: string;
+  submittedAt: string;
 }
 
-// Review / Decide Modal with CV
+interface User {
+  id: number;
+  username: string; // API returns username
+  email?: string;
+  role?: string;
+}
+
+// Review / Decide Modal
+import { useRouter } from "next/navigation";
+
 function ReviewModal({
   isOpen,
   onClose,
   onSubmit,
   application,
-  job,
+  user,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (status: "Approved" | "Rejected", reason: string) => void;
+  onSubmit: (status: "APPROVED" | "REJECTED", reason: string) => void;
   application: Application | null;
-  job: Job | null;
+  user: User | null;
 }) {
-  const [decision, setDecision] = useState<"Approved" | "Rejected">("Approved");
+  const [decision, setDecision] = useState<"APPROVED" | "REJECTED">("APPROVED");
   const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
+  const { token } = useAuth();
 
   useEffect(() => {
     if (!application) return;
-    setDecision("Approved");
-    setReason("");
+    setDecision("APPROVED");
+    setReason(application.reviewReason || "");
   }, [application]);
 
   if (!isOpen || !application) return null;
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      // Call the onSubmit function passed as prop
+      await onSubmit(decision, reason);
+
+      // Close the modal after submission
+      onClose();
+      setLoading(false);
+    } catch (err) {
+      setLoading(false);
+      setError("Unable to submit review. Please try again.");
+    }
+  };
+
+  const handleApprovalOrRejection = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      console.log(decision)
+      // Send approval or rejection decision to backend
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/applications/${application.id}/${decision.toLowerCase()}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`, // JWT token for authentication
+          },
+          body: JSON.stringify({ reviewReason: reason }),
+        }
+      );
+
+      const data = await response.json();
+      console.log(data)
+
+      if (data.success) {
+        alert(`${decision} successful`);
+        // Redirect to appropriate page if necessary
+        router.push("/hr/dashboard"); // Modify this based on where you want to redirect
+      } else {
+        setError(data.message || "Something went wrong!");
+      }
+    } catch (error) {
+      setError("Error communicating with the server.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-lg shadow p-6 w-full max-w-lg overflow-y-auto max-h-[90vh]">
         <h2 className="text-xl font-bold mb-4">Review Application</h2>
 
-        {/* Applicant Info */}
         <div className="mb-4 space-y-1">
-          <p><span className="font-semibold">Applicant:</span> {application.applicant}</p>
-          {application.email && <p><span className="font-semibold">Email:</span> {application.email}</p>}
-          {application.phone && <p><span className="font-semibold">Phone:</span> {application.phone}</p>}
-          <p><span className="font-semibold">Job:</span> {job?.title || "Unknown"}</p>
-          {job?.description && <p><span className="font-semibold">Job Description:</span> {job.description}</p>}
-          <p><span className="font-semibold">Current Status:</span> {application.status}</p>
-          {application.cvUrl && (
+          <p>
+            <span className="font-semibold">Applicant:</span>{" "}
+            {user?.email || "Unknown"}
+          </p>
+          {user?.email && (
             <p>
-              <span className="font-semibold">CV:</span>{" "}
-              <a
-                href={application.cvUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 underline"
-              >
-                View / Download
-              </a>
+              <span className="font-semibold">Email:</span> {user.email}
             </p>
           )}
+          <p>
+            <span className="font-semibold">Job:</span> {application.jobTitle}
+          </p>
+          <p>
+            <span className="font-semibold">Current Status:</span>{" "}
+            {application.status}
+          </p>
+          <p>
+            <span className="font-semibold">Submitted At:</span>{" "}
+            {new Date(application.submittedAt).toLocaleString()}
+          </p>
         </div>
 
-        {/* Decision */}
         <div className="flex flex-col gap-3 mb-4">
           <select
             className="border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
             value={decision}
-            onChange={(e) => setDecision(e.target.value as "Approved" | "Rejected")}
+            onChange={(e) =>
+              setDecision(e.target.value as "APPROVED" | "REJECTED")
+            }
           >
-            <option value="Approved">Approve</option>
-            <option value="Rejected">Reject</option>
+            <option value="APPROVED">Approve</option>
+            <option value="REJECTED">Reject</option>
           </select>
           <textarea
             placeholder="Reason (optional)"
@@ -93,7 +154,12 @@ function ReviewModal({
           />
         </div>
 
-        {/* Buttons */}
+        {error && (
+          <div className="bg-red-100 text-red-700 text-sm p-3 rounded-md mb-4">
+            {error}
+          </div>
+        )}
+
         <div className="flex justify-end gap-2">
           <button
             className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
@@ -104,94 +170,230 @@ function ReviewModal({
           <button
             className="px-4 py-2 rounded text-white"
             style={{ backgroundColor: "#4B5320" }}
-            onClick={() => onSubmit(decision, reason)}
+            onClick={handleApprovalOrRejection}
+            disabled={loading}
           >
-            Decide
+            {loading ? "Submitting..." : "Submit Decision"}
           </button>
         </div>
       </div>
     </div>
   );
 }
-
-// Main Page
 export default function PendingApplicationsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+  const [selectedApplication, setSelectedApplication] =
+    useState<Application | null>(null);
+
+  const [filterText, setFilterText] = useState("");
+  const [selectedFilter, setSelectedFilter] = useState("jobTitle");
+
+  const { token, role } = useAuth();
+
+  // Fetch applications
+  const fetchApplications = async () => {
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/applications`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const data = await res.json();
+      setApplications(data.data || []);
+    } catch (err) {
+      console.error("Failed to fetch applications", err);
+    }
+  };
+
+  // Fetch all users
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setUsers(data.data || []);
+    } catch (err) {
+      console.error("Failed to fetch users", err);
+    }
+  };
 
   useEffect(() => {
-    const dummyJobs: Job[] = [
-      { id: 1, title: "Frontend Developer", description: "Build awesome UIs" },
-      { id: 2, title: "Backend Developer", description: "Build APIs and manage DBs" },
-      { id: 3, title: "UI/UX Designer", description: "Design user-friendly interfaces" },
-    ];
-    setJobs(dummyJobs);
+    if (role !== "HR") return;
+    fetchApplications();
+    fetchUsers();
+  }, [role]);
 
-    const dummyApplications: Application[] = [
-      { id: 1, jobId: 1, applicant: "Alice", status: "Approved", email: "alice@mail.com" },
-      { id: 2, jobId: 2, applicant: "Bob", status: "Rejected", phone: "123-456-7890" },
-      { id: 3, jobId: 3, applicant: "Charlie", status: "Pending", email: "charlie@mail.com", cvUrl: "/cvs/charlie.pdf" },
-      { id: 4, jobId: 1, applicant: "David", status: "Pending", phone: "987-654-3210", cvUrl: "/cvs/david.pdf" },
-    ];
-    setApplications(dummyApplications);
-  }, []);
+  // Map users for fast lookup
+  const userMap = useMemo(() => {
+    const map: Record<number, User> = {};
+    users.forEach((u) => {
+      map[Number(u.id)] = u;
+    });
+    return map;
+  }, [users]);
 
-  const pendingApplications = applications.filter((a) => a.status === "Pending");
+  // Filter applications based on selected filter and text for summary cards
+  const filteredApplications = useMemo(() => {
+    return applications.filter((app) => {
+      const user = userMap[app.userId];
+      let filterValue = "";
 
-  const handleDecide = (status: "Approved" | "Rejected", reason: string) => {
+      if (selectedFilter === "jobTitle") {
+        filterValue = app.jobTitle || ""; // Ensure no null or undefined
+      } else if (selectedFilter === "applicant") {
+        filterValue = user?.username || ""; // Ensure no null or undefined
+      } else if (selectedFilter === "status") {
+        filterValue = app.status || ""; // Ensure no null or undefined
+      }
+
+      // Prevent calling toLowerCase on null or undefined
+      return filterValue.toLowerCase().includes(filterText.toLowerCase());
+    });
+  }, [applications, filterText, selectedFilter, userMap]);
+
+  const handleDecide = async (
+    status: "APPROVED" | "REJECTED",
+    reason: string
+  ) => {
     if (!selectedApplication) return;
-    setApplications(
-      applications.map((a) =>
-        a.id === selectedApplication.id ? { ...a, status, reason } : a
-      )
-    );
-    setModalOpen(false);
-    setSelectedApplication(null);
+
+    try {
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/applications/${selectedApplication.id}/decide`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status, reason }),
+        }
+      );
+
+      setApplications(
+        applications.map((a) =>
+          a.id === selectedApplication.id
+            ? { ...a, status, reviewReason: reason }
+            : a
+        )
+      );
+      setModalOpen(false);
+      setSelectedApplication(null);
+    } catch (err) {
+      console.error("Failed to update application", err);
+    }
   };
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <Sidebar isOpen={sidebarOpen} closeSidebar={() => setSidebarOpen(false)} />
+      <Sidebar
+        isOpen={sidebarOpen}
+        closeSidebar={() => setSidebarOpen(false)}
+      />
       <div className="flex-1 p-6">
-        <h1 className="text-3xl font-bold mb-6">Pending Applications</h1>
+        <h1 className="text-3xl font-bold mb-6">Applications</h1>
+
+        {/* Filter Dropdown and Input */}
+        <div className="flex mb-6 gap-4">
+          <select
+            className="p-2 border rounded"
+            value={selectedFilter}
+            onChange={(e) => setSelectedFilter(e.target.value)}
+          >
+            <option value="jobTitle">Job Title</option>
+            <option value="applicant">Applicant</option>
+            <option value="status">Status</option>
+          </select>
+          <input
+            type="text"
+            className="p-2 border rounded"
+            placeholder={`Search by ${selectedFilter}`}
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+          />
+        </div>
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          <Card title="Total Pending" value={pendingApplications.length.toString()} />
-          <Card title="Total Approved" value={applications.filter((a) => a.status === "Approved").length.toString()} />
-          <Card title="Total Rejected" value={applications.filter((a) => a.status === "Rejected").length.toString()} />
+          <Card
+            title="Total Pending"
+            value={filteredApplications.filter(
+              (app) => app.status === "PENDING"
+            ).length.toString()}
+          />
+          <Card
+            title="Total APPROVED"
+            value={filteredApplications.filter(
+              (app) => app.status === "APPROVED"
+            ).length.toString()}
+          />
+          <Card
+            title="Total REJECTED"
+            value={filteredApplications.filter(
+              (app) => app.status === "REJECTED"
+            ).length.toString()}
+          />
         </div>
 
-        {/* Pending Applications Table */}
+        {/* Applications Table (All Applications) */}
         <div className="bg-white rounded-lg shadow p-4 overflow-x-auto">
-          <table className="min-w-full table-auto border-collapse">
+          <table className="min-w-full border border-gray-200 rounded-lg overflow-hidden">
             <thead>
-              <tr className="bg-gray-100 text-left">
-                <th className="p-3 border-b">ID</th>
-                <th className="p-3 border-b">Applicant</th>
-                <th className="p-3 border-b">Job</th>
-                <th className="p-3 border-b">Status</th>
-                <th className="p-3 border-b">Action</th>
+              <tr className="bg-gray-100 text-sm uppercase tracking-wide text-gray-600">
+                <th className="p-3 text-left">#</th>
+                <th className="p-3 text-left">Applicant</th>
+                <th className="p-3 text-left">Job</th>
+                <th className="p-3 text-left">Contact</th>
+                <th className="p-3 text-left">Status</th>
+                <th className="p-3 text-left">Action</th>
               </tr>
             </thead>
+
             <tbody>
-              {pendingApplications.map((app, idx) => {
-                const job = jobs.find((j) => j.id === app.jobId);
+              {applications.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="text-center p-6 text-gray-500">
+                    No applications
+                  </td>
+                </tr>
+              )}
+
+              {applications.map((app, idx) => {
+                const user = userMap[Number(app.userId)];
                 return (
                   <tr
                     key={app.id}
-                    className={idx % 2 === 0 ? "bg-white hover:bg-gray-50" : "bg-gray-50 hover:bg-gray-100"}
+                    className="border-t hover:bg-gray-50 transition"
                   >
-                    <td className="p-3 border-b">{app.id}</td>
-                    <td className="p-3 border-b font-semibold">{app.applicant}</td>
-                    <td className="p-3 border-b">{job?.title || "Unknown"}</td>
-                    <td className="p-3 border-b text-yellow-600 font-semibold">{app.status}</td>
-                    <td className="p-3 border-b">
+                    <td className="p-3 font-medium">{idx + 1}</td>
+                    <td className="p-3 font-semibold text-gray-800">
+                      {user?.username || "Unknown"}
+                    </td>
+                    <td className="p-3">{app.jobTitle}</td>
+                    <td className="p-3 text-sm text-gray-600">
+                      {user?.email || "N/A"}
+                    </td>
+                    <td className="p-3">
+                      <span
+                        className={`px-2 py-1 text-xs rounded ${
+                          app.status === "PENDING"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : app.status === "APPROVED"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {app.status}
+                      </span>
+                    </td>
+                    <td className="p-3">
                       <button
-                        className="px-3 py-1 rounded text-white hover:opacity-90 transition"
+                        className="px-3 py-1 rounded text-white text-sm hover:opacity-90 transition"
                         style={{ backgroundColor: "#4B5320" }}
                         onClick={() => {
                           setSelectedApplication(app);
@@ -214,7 +416,9 @@ export default function PendingApplicationsPage() {
           onClose={() => setModalOpen(false)}
           onSubmit={handleDecide}
           application={selectedApplication}
-          job={selectedApplication ? jobs.find((j) => j.id === selectedApplication.jobId) || null : null}
+          user={
+            selectedApplication ? userMap[Number(selectedApplication.userId)] || null : null
+          }
         />
       </div>
     </div>

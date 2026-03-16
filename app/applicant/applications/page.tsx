@@ -1,65 +1,81 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 interface Application {
   id: number;
-  jobTitle: string;
-  status: "Approved" | "Pending" | "Rejected";
-  appliedAt: string;
-  description: string;
-  cv: string;
+  userId: number;
+  jobId: number | null;
+  jobTitle: string | null;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  reviewReason: string | null;
+  submittedAt: string;
 }
 
 const STATUS_COLORS: Record<Application["status"], string> = {
-  Approved: "bg-teal-500",
-  Pending: "bg-amber-500",
-  Rejected: "bg-rose-500",
+  APPROVED: "bg-teal-500",
+  PENDING: "bg-amber-500",
+  REJECTED: "bg-rose-500",
 };
 
 export default function ApplicantDashboard() {
+  const { userId, token } = useAuth();
   const [applications, setApplications] = useState<Application[]>([]);
   const [filter, setFilter] = useState<"All" | Application["status"]>("All");
-  const [selectedApp, setSelectedApp] = useState<Application | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    // Dummy data for preview
-    const dummyData: Application[] = [
-      {
-        id: 1,
-        jobTitle: "Frontend Developer",
-        status: "Pending",
-        appliedAt: "2026-03-10",
-        description: "Develop and maintain frontend features with React and Next.js",
-        cv: "John_Doe_CV.pdf",
-      },
-      {
-        id: 2,
-        jobTitle: "Backend Developer",
-        status: "Approved",
-        appliedAt: "2026-03-08",
-        description: "Work on REST APIs, database schemas, and server-side logic",
-        cv: "Jane_Smith_CV.pdf",
-      },
-      {
-        id: 3,
-        jobTitle: "UI/UX Designer",
-        status: "Rejected",
-        appliedAt: "2026-03-05",
-        description: "Design user interfaces and ensure a smooth user experience",
-        cv: "Alice_W_CV.pdf",
-      },
-    ];
-    setApplications(dummyData);
-  }, []);
+    const fetchApplications = async () => {
+      if (!userId || !token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/applications/user?userId=${userId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+
+        const data = await res.json();
+
+        if (!data.success) {
+          setError(data.message || "Failed to fetch applications");
+          setApplications([]);
+        } else {
+          setApplications(data.data || []);
+        }
+      } catch (err) {
+        console.error("Error fetching applications:", err);
+        setError("Failed to fetch applications");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchApplications();
+  }, [userId, token]);
 
   const filteredApps =
-    filter === "All" ? applications : applications.filter((a) => a.status === filter);
+    filter === "All"
+      ? applications
+      : applications.filter((a) => a.status === filter);
 
   const total = applications.length;
-  const approved = applications.filter((a) => a.status === "Approved").length;
-  const pending = applications.filter((a) => a.status === "Pending").length;
-  const rejected = applications.filter((a) => a.status === "Rejected").length;
+  const approved = applications.filter((a) => a.status === "APPROVED").length;
+  const pending = applications.filter((a) => a.status === "PENDING").length;
+  const rejected = applications.filter((a) => a.status === "REJECTED").length;
+
+  if (loading)
+    return <p className="text-center">Loading applications...</p>;
+  if (error) return <p className="p-6 text-center text-red-500">{error}</p>;
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto my-8">
@@ -87,7 +103,7 @@ export default function ApplicantDashboard() {
 
       {/* Filter Buttons */}
       <div className="flex flex-wrap gap-3">
-        {(["All", "Approved", "Pending", "Rejected"] as const).map((status) => (
+        {(["All", "APPROVED", "PENDING", "REJECTED"] as const).map((status) => (
           <button
             key={status}
             onClick={() => setFilter(status)}
@@ -108,16 +124,22 @@ export default function ApplicantDashboard() {
           filteredApps.map((app) => (
             <div
               key={app.id}
-              onClick={() => setSelectedApp(app)}
               className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition cursor-pointer"
             >
-              <h2 className="font-bold text-xl mb-2 text-gray-800">{app.jobTitle}</h2>
+              {/* Job Title */}
+              <h2 className="font-bold text-xl mb-2 text-gray-800">
+                {app.jobTitle || "Unknown Job"}
+              </h2>
+
+              {/* Submission Date */}
               <p className="text-gray-500 mb-3">
-                Applied on: {new Date(app.appliedAt).toLocaleDateString()}
+                Applied on: {new Date(app.submittedAt).toLocaleDateString()}
               </p>
+
+              {/* Status */}
               <span
                 className={`px-3 py-1 rounded-md text-white font-semibold ${
-                  STATUS_COLORS[app.status]
+                  STATUS_COLORS[app.status] || "bg-gray-500"
                 }`}
               >
                 {app.status}
@@ -130,42 +152,6 @@ export default function ApplicantDashboard() {
           </p>
         )}
       </div>
-
-      {/* Modal */}
-      {selectedApp && (
-        <div className="fixed inset-0 bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-6 relative">
-            <button
-              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700 font-bold text-xl"
-              onClick={() => setSelectedApp(null)}
-            >
-              &times;
-            </button>
-            <h2 className="text-2xl font-bold mb-4">{selectedApp.jobTitle}</h2>
-            <p className="text-gray-600 mb-2">
-              <span className="font-semibold">Applied on:</span>{" "}
-              {new Date(selectedApp.appliedAt).toLocaleDateString()}
-            </p>
-            <p className="text-gray-600 mb-2">
-              <span className="font-semibold">Status:</span>{" "}
-              <span
-                className={`px-2 py-1 rounded-full text-white ${
-                  STATUS_COLORS[selectedApp.status]
-                }`}
-              >
-                {selectedApp.status}
-              </span>
-            </p>
-            <p className="text-gray-600 mb-2">
-              <span className="font-semibold">Job Description:</span>{" "}
-              {selectedApp.description}
-            </p>
-            <p className="text-gray-600">
-              <span className="font-semibold">CV:</span> {selectedApp.cv}
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
