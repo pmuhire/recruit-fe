@@ -6,7 +6,8 @@ interface AuthContextType {
   token: string | null;
   role: string | null;
   username: string | null;
-  userId: string | null; // Add userId to context
+  userId: string | null;
+  loading: boolean; // ✅ NEW
   login: (
     token: string,
     role: string,
@@ -22,13 +23,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null); // State for userId
+  const [userId, setUserId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true); // ✅ NEW
 
   useEffect(() => {
-    setToken(localStorage.getItem("token"));
-    setRole(localStorage.getItem("role"));
-    setUsername(localStorage.getItem("username"));
-    setUserId(localStorage.getItem("userId")); // Retrieve userId from localStorage
+    const storedToken = localStorage.getItem("token");
+    const storedRole = localStorage.getItem("role");
+    const storedUsername = localStorage.getItem("username");
+    const storedUserId = localStorage.getItem("userId");
+
+    setToken(storedToken);
+    setRole(storedRole);
+    setUsername(storedUsername);
+    setUserId(storedUserId);
+
+    setLoading(false); // ✅ VERY IMPORTANT
   }, []);
 
   const login = (
@@ -40,29 +49,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("token", token);
     localStorage.setItem("role", role);
     localStorage.setItem("username", username);
-    localStorage.setItem("userId", userId); // Save userId in localStorage
+    localStorage.setItem("userId", userId);
 
     setToken(token);
     setRole(role);
     setUsername(username);
-    setUserId(userId); // Set userId in state
+    setUserId(userId);
   };
 
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("role");
     localStorage.removeItem("username");
-    localStorage.removeItem("userId"); // Remove userId from localStorage
+    localStorage.removeItem("userId");
 
     setToken(null);
     setRole(null);
     setUsername(null);
-    setUserId(null); // Reset userId in state
+    setUserId(null);
   };
 
   return (
     <AuthContext.Provider
-      value={{ token, role, username, userId, login, logout }}
+      value={{ token, role, username, userId, loading, login, logout }}
     >
       {children}
     </AuthContext.Provider>

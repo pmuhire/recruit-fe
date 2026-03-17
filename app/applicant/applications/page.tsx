@@ -21,19 +21,30 @@ const STATUS_COLORS: Record<Application["status"], string> = {
 };
 
 export default function ApplicantDashboard() {
-  const { userId, token } = useAuth();
+  const { userId, token, loading: authLoading } = useAuth();
+  const router = useRouter();
+
   const [applications, setApplications] = useState<Application[]>([]);
   const [filter, setFilter] = useState<"All" | Application["status"]>("All");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // ✅ Redirect if not logged in (AFTER auth loads)
   useEffect(() => {
-    const fetchApplications = async () => {
-      if (!userId || !token) {
-        setLoading(false);
-        return;
-      }
+    if (!authLoading && (!userId || !token)) {
+      router.push("/login");
+    }
+  }, [authLoading, userId, token, router]);
 
+  useEffect(() => {
+    if (authLoading) return; // ✅ WAIT for auth
+
+    if (!userId || !token) {
+      setLoading(false);
+      return;
+    }
+
+    const fetchApplications = async () => {
       try {
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/api/applications/user?userId=${userId}`,
@@ -61,7 +72,7 @@ export default function ApplicantDashboard() {
     };
 
     fetchApplications();
-  }, [userId, token]);
+  }, [userId, token, authLoading]);
 
   const filteredApps =
     filter === "All"
@@ -73,15 +84,17 @@ export default function ApplicantDashboard() {
   const pending = applications.filter((a) => a.status === "PENDING").length;
   const rejected = applications.filter((a) => a.status === "REJECTED").length;
 
-  if (loading)
+  // ✅ Handle loading correctly
+  if (loading || authLoading)
     return <p className="text-center">Loading applications...</p>;
-  if (error) return <p className="p-6 text-center text-red-500">{error}</p>;
+
+  if (error)
+    return <p className="p-6 text-center text-red-500">{error}</p>;
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto my-8">
       <h1 className="text-3xl font-bold text-gray-800">My Applications</h1>
 
-      {/* Summary Cards */}
       <div className="grid md:grid-cols-4 gap-6">
         <div className="bg-white rounded-lg shadow p-6 text-center">
           <p className="text-gray-500 font-medium">Total Applications</p>
@@ -101,7 +114,6 @@ export default function ApplicantDashboard() {
         </div>
       </div>
 
-      {/* Filter Buttons */}
       <div className="flex flex-wrap gap-3">
         {(["All", "APPROVED", "PENDING", "REJECTED"] as const).map((status) => (
           <button
@@ -118,7 +130,6 @@ export default function ApplicantDashboard() {
         ))}
       </div>
 
-      {/* Application Cards */}
       <div className="grid md:grid-cols-3 sm:grid-cols-2 gap-6">
         {filteredApps.length > 0 ? (
           filteredApps.map((app) => (
@@ -126,17 +137,14 @@ export default function ApplicantDashboard() {
               key={app.id}
               className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition cursor-pointer"
             >
-              {/* Job Title */}
               <h2 className="font-bold text-xl mb-2 text-gray-800">
                 {app.jobTitle || "Unknown Job"}
               </h2>
 
-              {/* Submission Date */}
               <p className="text-gray-500 mb-3">
                 Applied on: {new Date(app.submittedAt).toLocaleDateString()}
               </p>
 
-              {/* Status */}
               <span
                 className={`px-3 py-1 rounded-md text-white font-semibold ${
                   STATUS_COLORS[app.status] || "bg-gray-500"
