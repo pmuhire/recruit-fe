@@ -1,8 +1,7 @@
-
 "use client";
-import { AuthProvider } from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
 import "./globals.css";
+import Providers from "@/context/Providers";
 
 export default function RootLayout({
   children,
@@ -12,10 +11,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <AuthProvider>
+        <Providers>
           <Navbar />
           <main className="min-h-screen bg-gray-100">{children}</main>
-        </AuthProvider>
+        </Providers>
       </body>
     </html>
   );
