@@ -68,14 +68,17 @@ function ReviewModal({
           ? `/api/applications/${application.id}/approve`
           : `/api/applications/${application.id}/reject`;
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}${endpoint}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ reviewReason: reason }),
         },
-        body: JSON.stringify({ reviewReason: reason }),
-      });
+      );
 
       const data = await response.json();
 
@@ -148,7 +151,9 @@ function ReviewModal({
           <select
             className="border border-gray-300 p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600"
             value={decision}
-            onChange={(e) => setDecision(e.target.value as "APPROVED" | "REJECTED")}
+            onChange={(e) =>
+              setDecision(e.target.value as "APPROVED" | "REJECTED")
+            }
           >
             <option value="APPROVED">Approve</option>
             <option value="REJECTED">Reject</option>
@@ -194,7 +199,8 @@ export default function PendingApplicationsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [applications, setApplications] = useState<Application[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+  const [selectedApplication, setSelectedApplication] =
+    useState<Application | null>(null);
   const [loading, setLoading] = useState(false);
 
   const [filterText, setFilterText] = useState("");
@@ -206,9 +212,12 @@ export default function PendingApplicationsPage() {
     if (!token) return; // defensive
     setLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/applications`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/applications`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       const data = await res.json();
       setApplications(Array.isArray(data.data) ? data.data : []);
     } catch (err) {
@@ -230,7 +239,8 @@ export default function PendingApplicationsPage() {
 
       let filterValue = "";
       if (selectedFilter === "jobTitle") filterValue = app.jobTitle || "";
-      else if (selectedFilter === "applicant") filterValue = app.user?.username || "";
+      else if (selectedFilter === "applicant")
+        filterValue = app.user?.username || "";
       else if (selectedFilter === "status") filterValue = app.status || "";
 
       return filterValue.toLowerCase().includes(filterText.toLowerCase());
@@ -241,15 +251,20 @@ export default function PendingApplicationsPage() {
     if (!selectedApplication) return;
     setApplications(
       applications.map((a) =>
-        a.id === selectedApplication.id ? { ...a, status, reviewReason: reason } : a
-      )
+        a.id === selectedApplication.id
+          ? { ...a, status, reviewReason: reason }
+          : a,
+      ),
     );
     setSelectedApplication(null);
   };
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <Sidebar isOpen={sidebarOpen} closeSidebar={() => setSidebarOpen(false)} />
+      <Sidebar
+        isOpen={sidebarOpen}
+        closeSidebar={() => setSidebarOpen(false)}
+      />
       <div className="flex-1 p-6">
         <h1 className="text-3xl font-bold mb-6">Applications</h1>
 
@@ -276,15 +291,21 @@ export default function PendingApplicationsPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           <Card
             title="Total Pending"
-            value={filteredApplications.filter((a) => a.status === "PENDING").length.toString()}
+            value={filteredApplications
+              .filter((a) => a.status === "PENDING")
+              .length.toString()}
           />
           <Card
             title="Total APPROVED"
-            value={filteredApplications.filter((a) => a.status === "APPROVED").length.toString()}
+            value={filteredApplications
+              .filter((a) => a.status === "APPROVED")
+              .length.toString()}
           />
           <Card
             title="Total REJECTED"
-            value={filteredApplications.filter((a) => a.status === "REJECTED").length.toString()}
+            value={filteredApplications
+              .filter((a) => a.status === "REJECTED")
+              .length.toString()}
           />
         </div>
 
@@ -304,46 +325,54 @@ export default function PendingApplicationsPage() {
                 </tr>
               </thead>
               <tbody>
-                {applications.length === 0 && (
+                {filteredApplications.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="text-center p-6 text-gray-500">
-                      No applications
+                      No applications match your filter
                     </td>
                   </tr>
+                ) : (
+                  filteredApplications.map((app, idx) => (
+                    <tr
+                      key={app.id}
+                      className="border-t hover:bg-gray-50 transition"
+                    >
+                      <td className="p-3 font-medium">{idx + 1}</td>
+                      <td className="p-3 font-semibold text-gray-800">
+                        {app.user?.username || "N/A"}
+                      </td>
+                      <td className="p-3">{app.jobTitle}</td>
+                      <td className="p-3 text-sm text-gray-600">
+                        {app.user?.email || "N/A"}
+                      </td>
+                      <td className="p-3">
+                        <span
+                          className={`px-2 py-1 text-xs rounded ${
+                            app.status === "PENDING"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : app.status === "APPROVED"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-red-100 text-red-700"
+                          }`}
+                        >
+                          {app.status}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <button
+                          className="px-3 py-1 rounded text-white text-sm hover:opacity-90 transition"
+                          style={{ backgroundColor: "#4B5320" }}
+                          onClick={() => {
+                            setSelectedApplication(app);
+                            setModalOpen(true);
+                          }}
+                        >
+                          Review
+                        </button>
+                      </td>
+                    </tr>
+                  ))
                 )}
-                {applications.map((app, idx) => (
-                  <tr key={app.id} className="border-t hover:bg-gray-50 transition">
-                    <td className="p-3 font-medium">{idx + 1}</td>
-                    <td className="p-3 font-semibold text-gray-800">{app.user?.username || "N/A"}</td>
-                    <td className="p-3">{app.jobTitle}</td>
-                    <td className="p-3 text-sm text-gray-600">{app.user?.email || "N/A"}</td>
-                    <td className="p-3">
-                      <span
-                        className={`px-2 py-1 text-xs rounded ${
-                          app.status === "PENDING"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : app.status === "APPROVED"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {app.status}
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      <button
-                        className="px-3 py-1 rounded text-white text-sm hover:opacity-90 transition"
-                        style={{ backgroundColor: "#4B5320" }}
-                        onClick={() => {
-                          setSelectedApplication(app);
-                          setModalOpen(true);
-                        }}
-                      >
-                        Review
-                      </button>
-                    </td>
-                  </tr>
-                ))}
               </tbody>
             </table>
           </div>
