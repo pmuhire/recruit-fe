@@ -101,35 +101,57 @@ export default function LandingPage() {
         {filteredJobs.map((job) => (
           <div
             key={job.id}
-            className="p-5 border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition bg-white"
+            className="p-5 border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition bg-white flex flex-col h-full"
           >
-            <h2 className="text-xl font-semibold text-gray-800">{job.title}</h2>
-            <p className="text-gray-500 mt-1">{job.description}</p>
-            <p className="text-gray-500 mt-1 italic text-sm">
-              Requirements: {job.requirements}
-            </p>
-            <p className="mt-2 text-gray-400 text-sm">
-              Posted on: {new Date(job.createdAt).toLocaleDateString()}
+            {/* Header */}
+            <div className="mb-3">
+              <h2 className="text-lg font-semibold text-gray-800 line-clamp-2">
+                {job.title}
+              </h2>
+
+              <p className="text-xs text-gray-400 mt-1">
+                Posted on: {new Date(job.createdAt).toLocaleDateString()}
+              </p>
+            </div>
+
+            {/* Description */}
+            <p className="text-gray-600 text-sm line-clamp-3">
+              {job.description}
             </p>
 
-            <p
-              className={`mt-2 font-medium ${
-                job.status === "OPEN" ? "text-[#4B5320]" : "text-gray-500"
-              }`}
-            >
-              {job.status}
+            {/* Requirements */}
+            <p className="text-gray-500 text-sm italic mt-2 line-clamp-2">
+              {job.requirements}
             </p>
 
-            <Link
-              href={job.status === "OPEN" ? `/jobs/${job.id}` : `/jobs/${job.id}`}
-              className={`mt-4 block text-center py-2 rounded-md font-medium transition ${
-                job.status === "OPEN"
-                  ? "bg-[#4B5320] text-white hover:bg-[#3f461c]"
-                  : "bg-gray-300 text-gray-600 cursor-not-allowed"
-              }`}
-            >
-              Apply
-            </Link>
+            {/* Spacer */}
+            <div className="flex-grow" />
+
+            {/* Footer */}
+            <div className="mt-4 flex items-center justify-between">
+              {/* Status Badge */}
+              <span
+                className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                  job.status === "OPEN"
+                    ? "bg-green-100 text-green-700"
+                    : "bg-gray-200 text-gray-600"
+                }`}
+              >
+                {job.status}
+              </span>
+
+              {/* Apply Button */}
+              <Link
+                href={`/jobs/${job.id}`}
+                className={`px-4 py-2 text-sm rounded-md font-medium transition ${
+                  job.status === "OPEN"
+                    ? "bg-[#4B5320] text-white hover:bg-[#3f461c]"
+                    : "bg-gray-300 text-gray-600 cursor-not-allowed"
+                }`}
+              >
+                Apply
+              </Link>
+            </div>
           </div>
         ))}
 
