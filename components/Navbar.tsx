@@ -27,25 +27,25 @@ export default function Navbar({ openSidebar }: NavbarProps) {
 
     if (role === "APPLICANT") {
       return [
-        { href: "/jobs", label: "Jobs" },
+        { href: "/", label: "Jobs" },
         { href: "/applicant/applications", label: "My Applications" },
       ];
     }
 
     if (role === "HR") {
       return [
-        { href: "/dashboard", label: "Dashboard" },
-        { href: "/jobs", label: "Jobs" },
-        { href: "/applications", label: "Applications" },
+        { href: "/hr/dashboard", label: "Dashboard" },
+        { href: "/hr/jobs", label: "Jobs" },
+        { href: "/hr/applications", label: "Applications" },
       ];
     }
 
     if (role === "SUPERADMIN") {
       return [
-        { href: "/dashboard", label: "Dashboard" },
-        { href: "/jobs", label: "Jobs" },
-        { href: "/applications", label: "Applications" },
-        { href: "/users", label: "Users" },
+        { href: "/hr/dashboard", label: "Dashboard" },
+        { href: "/hr/jobs", label: "Jobs" },
+        { href: "/hr/applications", label: "Applications" },
+        { href: "/hr/users", label: "Users" },
       ];
     }
 
@@ -69,7 +69,7 @@ export default function Navbar({ openSidebar }: NavbarProps) {
         {/* Logo */}
         <h1
           className="font-bold text-lg cursor-pointer"
-          onClick={() => router.push(token ? "/dashboard" : "/")}
+          onClick={() => router.push(token ? "/" : "/")}
         >
           E-Recruit
         </h1>
