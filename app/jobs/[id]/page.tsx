@@ -3,12 +3,13 @@
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import Spinner from "@/components/ui/spinner";
 
 interface Job {
   id: string;
   title: string;
   description: string;
-  requirements: string; // plain text
+  requirements: string;
   status: "OPEN" | "CLOSED";
   createdAt: string;
 }
@@ -16,51 +17,58 @@ interface Job {
 export default function JobDetails() {
   const params = useParams();
   const router = useRouter();
-  const { userId, token } = useAuth(); // get userId and token from context
-  const jobId = params.id;
+  const { userId, token, role, loading: authLoading } = useAuth();
+
+  const jobId = params?.id;
 
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
 
-  // Form state
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [motivation, setMotivation] = useState("");
   const [cvFile, setCvFile] = useState<File | null>(null);
 
-  // Redirect to login if user is not logged in
+  // ✅ Auth guard (NO flicker)
   useEffect(() => {
-    if (!userId || !token) {
-      router.push("/login");
+    if (!authLoading && (!userId || !token || role !== "APPLICANT")) {
+      router.replace("/login");
     }
-  }, [userId, token, router]);
+  }, [authLoading, userId, token, role, router]);
 
-  // Fetch Job
+  // ✅ Fetch Job safely
   useEffect(() => {
+    if (authLoading) return;
+
+    if (!token || !jobId) {
+      setLoading(false);
+      return;
+    }
+
     const fetchJob = async () => {
-      if (!token) return;
       setLoading(true);
       setError("");
-      try {
-        const headers: Record<string, string> = {
-          "Content-Type": "application/json",
-        };
-        headers["Authorization"] = `Bearer ${token}`;
 
+      try {
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/jobs/${jobId}`,
-          { headers },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
         );
+
         const response = await res.json();
 
-        if (res.ok && response.success) {
+        if (res.ok && response?.success && response?.data) {
           setJob(response.data);
         } else {
           setJob(null);
-          setError(response.message || "Failed to fetch job details");
+          setError(response?.message || "Failed to fetch job details");
         }
       } catch (err) {
         console.error("Error fetching job:", err);
@@ -72,14 +80,14 @@ export default function JobDetails() {
     };
 
     fetchJob();
-  }, [jobId, token]);
+  }, [jobId, token, authLoading]);
 
-  // Handle application submission
+  // ✅ Submit application
   const handleSubmitApplication = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
 
-    if (!cvFile || !userId) {
+    if (!cvFile || !userId || !token) {
       setFormError("Please provide your CV and ensure you are logged in.");
       return;
     }
@@ -100,22 +108,21 @@ export default function JobDetails() {
             Authorization: `Bearer ${token}`,
           },
           body: formData,
-        },
+        }
       );
 
       const data = await res.json();
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to submit application");
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || "Failed to submit application");
       }
 
-      // reset form
+      // Reset form
       setFullName("");
       setEmail("");
       setMotivation("");
       setCvFile(null);
 
-      // redirect
       router.push("/applicant/applications");
     } catch (err: any) {
       console.error("Application submission error:", err);
@@ -125,22 +132,41 @@ export default function JobDetails() {
     }
   };
 
-  if (loading) return <p className="text-center mt-10">Loading...</p>;
-  if (error) return <p className="text-center mt-10 text-red-500">{error}</p>;
-  if (!job) return <p className="text-center mt-10">Job not found</p>;
+  // ✅ Global loading control (no flicker)
+  if (authLoading) return <Spinner />;
+  if (!userId || !token || role !== "APPLICANT") return <Spinner />;
+  if (loading) return <Spinner />;
+
+  // ✅ Error UI
+  if (error)
+    return (
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <p className="text-red-500">{error}</p>
+      </div>
+    );
+
+  // ✅ No job found
+  if (!job)
+    return (
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <p className="text-gray-500">Job not found</p>
+      </div>
+    );
 
   return (
     <div className="max-w-3xl mx-auto py-4 px-4">
       <div className="bg-white shadow-md rounded-lg p-8 mb-10">
-        {/* Job Header */}
+        {/* Header */}
         <div className="border-b pb-6 mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">{job.title}</h1>
+          <h1 className="text-3xl font-bold text-gray-800">
+            {job.title}
+          </h1>
         </div>
 
-        {/* Job Description */}
+        {/* Description */}
         <div className="mb-6">
           <h2 className="text-xl font-semibold mb-2">Job Description</h2>
-          <p className="text-gray-700 leading-relaxed">{job.description}</p>
+          <p className="text-gray-700">{job.description}</p>
         </div>
 
         {/* Requirements */}
@@ -149,17 +175,22 @@ export default function JobDetails() {
           <p className="text-gray-700">{job.requirements}</p>
         </div>
 
-        {/* Apply Section */}
+        {/* Apply */}
         {job.status === "OPEN" ? (
           <div className="border-t pt-6">
-            <h2 className="text-xl font-semibold mb-4">Apply for this Job</h2>
+            <h2 className="text-xl font-semibold mb-4">
+              Apply for this Job
+            </h2>
+
             <form className="space-y-4" onSubmit={handleSubmitApplication}>
-              {formError && <p className="text-red-500">{formError}</p>}
+              {formError && (
+                <p className="text-red-500 text-sm">{formError}</p>
+              )}
 
               <input
                 type="text"
                 placeholder="Full Name"
-                className="w-full border border-gray-300 p-3 rounded focus:ring-2 focus:ring-[#4B5320]"
+                className="w-full border p-3 rounded focus:ring-2 focus:ring-[#4B5320]"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
@@ -168,7 +199,7 @@ export default function JobDetails() {
               <input
                 type="email"
                 placeholder="Email"
-                className="w-full border border-gray-300 p-3 rounded focus:ring-2 focus:ring-[#4B5320]"
+                className="w-full border p-3 rounded focus:ring-2 focus:ring-[#4B5320]"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -177,7 +208,7 @@ export default function JobDetails() {
               <textarea
                 placeholder="Short motivation..."
                 rows={4}
-                className="w-full border border-gray-300 p-3 rounded focus:ring-2 focus:ring-[#4B5320]"
+                className="w-full border p-3 rounded focus:ring-2 focus:ring-[#4B5320]"
                 value={motivation}
                 onChange={(e) => setMotivation(e.target.value)}
               />
@@ -185,7 +216,7 @@ export default function JobDetails() {
               <input
                 type="file"
                 accept=".pdf,.doc,.docx"
-                className="w-full border border-gray-300 p-3 rounded"
+                className="w-full border p-3 rounded"
                 onChange={(e) => setCvFile(e.target.files?.[0] || null)}
                 required
               />

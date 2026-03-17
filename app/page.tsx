@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 interface Job {
   id: number;
@@ -13,46 +14,59 @@ interface Job {
   createdAt: string;
 }
 
+// Simple Spinner Component (reusable)
+function Spinner() {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="w-10 h-10 border-4 border-gray-300 border-t-[#4B5320] rounded-full animate-spin" />
+    </div>
+  );
+}
+
 export default function LandingPage() {
   const router = useRouter();
-  const [error, setError] = useState<string>("");
+  const { token, role } = useAuth();
+
+  const [error, setError] = useState("");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [filter, setFilter] = useState<"ALL" | "OPEN" | "CLOSED">("ALL");
   const [loading, setLoading] = useState(true);
 
-  // Restrict page to APPLICANT only
+  // ✅ Restrict page using context (NOT localStorage)
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const role = localStorage.getItem("role");
-
     if (!token || role !== "APPLICANT") {
       router.replace("/login");
     }
-  }, [router]);
+  }, [token, role, router]);
 
-  // Fetch jobs from API
+  // ✅ Fetch jobs safely
   useEffect(() => {
+    if (!token) return;
+
     const fetchJobs = async () => {
+      setLoading(true);
       try {
         const res = await fetch(
-          "https://recruit-be-production.up.railway.app/jobs/all",
+          `${process.env.NEXT_PUBLIC_API_URL}/jobs/all`,
           {
             headers: {
               "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`, // defensive (future-proof)
             },
-          },
+          }
         );
 
         const response = await res.json();
 
-        if (res.ok && response.success) {
+        if (res.ok && response?.success && Array.isArray(response.data)) {
           setJobs(response.data);
           setError("");
         } else {
           setJobs([]);
-          setError(response.message || "Failed to fetch jobs");
+          setError(response?.message || "Failed to fetch jobs");
         }
       } catch (err) {
+        console.error(err);
         setJobs([]);
         setError("Unable to fetch jobs. Please try again later.");
       } finally {
@@ -61,23 +75,28 @@ export default function LandingPage() {
     };
 
     fetchJobs();
-  }, []);
+  }, [token]);
 
+  // ✅ Defensive filtering
   const filteredJobs = jobs.filter((job) =>
-    filter === "ALL" ? true : job.status === filter,
+    filter === "ALL" ? true : job?.status === filter
   );
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Loading jobs...</p>
-      </div>
-    );
-  }
+  // ✅ Loading state with spinner
+  if (loading) return <Spinner />;
 
   return (
     <div className="max-w-6xl mx-auto py-4 px-4">
-      <h1 className="text-3xl font-bold mb-4 text-gray-800">Available Jobs</h1>
+      <h1 className="text-3xl font-bold mb-4 text-gray-800">
+        Available Jobs
+      </h1>
+
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-100 text-red-700 p-3 rounded mb-4 text-sm">
+          {error}
+        </div>
+      )}
 
       {/* Filter Buttons */}
       <div className="flex gap-3 mb-6">
@@ -110,26 +129,28 @@ export default function LandingPage() {
               </h2>
 
               <p className="text-xs text-gray-400 mt-1">
-                Posted on: {new Date(job.createdAt).toLocaleDateString()}
+                Posted on:{" "}
+                {job.createdAt
+                  ? new Date(job.createdAt).toLocaleDateString()
+                  : "N/A"}
               </p>
             </div>
 
             {/* Description */}
             <p className="text-gray-600 text-sm line-clamp-3">
-              {job.description}
+              {job.description || "No description"}
             </p>
 
             {/* Requirements */}
             <p className="text-gray-500 text-sm italic mt-2 line-clamp-2">
-              {job.requirements}
+              {job.requirements || "No requirements listed"}
             </p>
 
-            {/* Spacer */}
             <div className="flex-grow" />
 
             {/* Footer */}
             <div className="mt-4 flex items-center justify-between">
-              {/* Status Badge */}
+              {/* Status */}
               <span
                 className={`px-3 py-1 text-xs font-semibold rounded-full ${
                   job.status === "OPEN"
@@ -140,13 +161,13 @@ export default function LandingPage() {
                 {job.status}
               </span>
 
-              {/* Apply Button */}
+              {/* Apply */}
               <Link
                 href={`/jobs/${job.id}`}
                 className={`px-4 py-2 text-sm rounded-md font-medium transition ${
                   job.status === "OPEN"
                     ? "bg-[#4B5320] text-white hover:bg-[#3f461c]"
-                    : "bg-gray-300 text-gray-600 cursor-not-allowed"
+                    : "bg-gray-300 text-gray-600 pointer-events-none"
                 }`}
               >
                 Apply
