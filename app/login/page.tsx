@@ -58,7 +58,7 @@ export default function LoginPage() {
 
     try {
       const res = await fetch(
-        "https://recruit-be-production.up.railway.app/auth/login",
+        "https://recruit-be-w7bh.onrender.com/auth/login",
         {
           method: "POST",
           headers: {

@@ -80,7 +80,7 @@ export default function RegisterPage() {
       console.log("REGISTER REQUEST:", form);
 
       const res = await fetch(
-        "https://recruit-be-production.up.railway.app/auth/register",
+        "https://recruit-be-w7bh.onrender.com/auth/register",
         {
           method: "POST",
           headers: {
