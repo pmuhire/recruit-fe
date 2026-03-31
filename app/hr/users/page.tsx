@@ -51,7 +51,7 @@ function CreateUserModal({
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ username: newUsername, email: newEmail }),
-        }
+        },
       );
 
       const data = await res.json();
@@ -170,13 +170,13 @@ export default function UsersPage() {
       filtered = filtered.filter(
         (u) =>
           (u.username?.toLowerCase() || "").includes(lowerSearch) ||
-          (u.email?.toLowerCase() || "").includes(lowerSearch)
+          (u.email?.toLowerCase() || "").includes(lowerSearch),
       );
     }
 
     filtered.sort((a, b) => {
-      const fieldA = (a[sortField]?.toLowerCase() || "");
-      const fieldB = (b[sortField]?.toLowerCase() || "");
+      const fieldA = a[sortField]?.toLowerCase() || "";
+      const fieldB = b[sortField]?.toLowerCase() || "";
       if (fieldA < fieldB) return sortOrder === "asc" ? -1 : 1;
       if (fieldA > fieldB) return sortOrder === "asc" ? 1 : -1;
       return 0;
@@ -188,7 +188,7 @@ export default function UsersPage() {
   const totalPages = Math.ceil(processedUsers.length / USERS_PER_PAGE);
   const paginatedUsers = processedUsers.slice(
     (currentPage - 1) * USERS_PER_PAGE,
-    currentPage * USERS_PER_PAGE
+    currentPage * USERS_PER_PAGE,
   );
 
   const handleCreate = (user: User) => {
@@ -197,7 +197,10 @@ export default function UsersPage() {
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <Sidebar isOpen={sidebarOpen} closeSidebar={() => setSidebarOpen(false)} />
+      <Sidebar
+        isOpen={sidebarOpen}
+        closeSidebar={() => setSidebarOpen(false)}
+      />
 
       <div className="flex-1 p-6">
         <div className="flex justify-between items-center mb-6">
@@ -236,7 +239,9 @@ export default function UsersPage() {
           <select
             className="p-3 border border-gray-300 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-green-600 transition"
             value={sortField}
-            onChange={(e) => setSortField(e.target.value as "username" | "email")}
+            onChange={(e) =>
+              setSortField(e.target.value as "username" | "email")
+            }
           >
             <option value="username">Sort by Username</option>
             <option value="email">Sort by Email</option>
@@ -258,36 +263,48 @@ export default function UsersPage() {
           <>
             {/* Table */}
             <div className="bg-white rounded-lg shadow p-4 overflow-x-auto">
-              <table className="min-w-full border border-gray-200 rounded-lg">
-                <thead>
-                  <tr className="bg-gray-100 text-sm uppercase tracking-wide text-gray-600">
-                    <th className="p-3 text-left">#</th>
-                    <th className="p-3 text-left">Username</th>
-                    <th className="p-3 text-left">Email</th>
-                    <th className="p-3 text-left">Role</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedUsers.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="text-center p-6 text-gray-500">
-                        No users found
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="min-w-full border overflow-x-auto border-gray-200 rounded-lg">
+                  <thead>
+                    <tr className="bg-gray-100 text-sm uppercase tracking-wide text-gray-600">
+                      <th className="p-3 text-left">#</th>
+                      <th className="p-3 text-left">Username</th>
+                      <th className="p-3 text-left">Email</th>
+                      <th className="p-3 text-left">Role</th>
                     </tr>
-                  ) : (
-                    paginatedUsers.map((user, idx) => (
-                      <tr key={user.id} className="border-t hover:bg-gray-50 transition">
-                        <td className="p-3 font-medium">
-                          {(currentPage - 1) * USERS_PER_PAGE + idx + 1}
+                  </thead>
+                  <tbody>
+                    {paginatedUsers.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={4}
+                          className="text-center p-6 text-gray-500"
+                        >
+                          No users found
                         </td>
-                        <td className="p-3 font-semibold text-gray-800">{user.username}</td>
-                        <td className="p-3 text-sm text-gray-600">{user.email}</td>
-                        <td className="p-3 font-medium">{user.role}</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      paginatedUsers.map((user, idx) => (
+                        <tr
+                          key={user.id}
+                          className="border-t hover:bg-gray-50 transition"
+                        >
+                          <td className="p-3 font-medium">
+                            {(currentPage - 1) * USERS_PER_PAGE + idx + 1}
+                          </td>
+                          <td className="p-3 font-semibold text-gray-800">
+                            {user.username}
+                          </td>
+                          <td className="p-3 text-sm text-gray-600">
+                            {user.email}
+                          </td>
+                          <td className="p-3 font-medium">{user.role}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Pagination */}
@@ -305,7 +322,9 @@ export default function UsersPage() {
                 </span>
                 <button
                   className="px-3 py-1 border rounded disabled:opacity-50"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
                   disabled={currentPage === totalPages}
                 >
                   Next

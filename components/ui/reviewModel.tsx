@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 
 interface User {
@@ -8,16 +8,23 @@ interface User {
   role?: string;
 }
 
+interface ApplicationDocument {
+  id: number;
+  fileName: string;
+  uploadedAt?: string;
+}
+
 interface Application {
   id: number;
-  user: User | null; // defensive
+  user: User | null;
   jobId: number;
   jobTitle: string;
   status: "APPROVED" | "REJECTED" | "PENDING";
   reviewReason?: string;
   submittedAt: string;
-  documents?: { id: number; fileName: string; fileUrl: string }[];
+  documents?: ApplicationDocument[];
 }
+
 // Review Modal
 export function ReviewModal({
   isOpen,
@@ -84,19 +91,54 @@ export function ReviewModal({
     }
   };
 
-  const handleViewDocument = (fileUrl: string) => {
-    window.open(fileUrl, "_blank", "noopener,noreferrer");
+  const getDocumentUrl = async (documentId: number) => {
+    if (!token) {
+      throw new Error("Authentication token missing");
+    }
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/documents/${documentId}/view-url`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data?.message || "Failed to get document URL");
+    }
+
+    if (!data?.url) {
+      throw new Error("Document URL was not returned");
+    }
+
+    return data.url as string;
   };
 
-  const handleDownloadDocument = async (doc: {
-    id: number;
-    fileName: string;
-    fileUrl: string;
-  }) => {
+  const handleViewDocument = async (doc: ApplicationDocument) => {
+    try {
+      setDocLoadingId(doc.id);
+      const signedUrl = await getDocumentUrl(doc.id);
+      window.open(signedUrl, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to open document.");
+    } finally {
+      setDocLoadingId(null);
+    }
+  };
+
+  const handleDownloadDocument = async (doc: ApplicationDocument) => {
     try {
       setDocLoadingId(doc.id);
 
-      const response = await fetch(doc.fileUrl);
+      const signedUrl = await getDocumentUrl(doc.id);
+      const response = await fetch(signedUrl);
+
       if (!response.ok) {
         throw new Error("Failed to download document");
       }
@@ -176,10 +218,11 @@ export function ReviewModal({
                     <div className="flex gap-2 mt-3 md:mt-0">
                       <button
                         type="button"
-                        onClick={() => handleViewDocument(doc.fileUrl)}
-                        className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                        onClick={() => handleViewDocument(doc)}
+                        disabled={isDocLoading}
+                        className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:opacity-60"
                       >
-                        View
+                        {isDocLoading ? "Opening..." : "View"}
                       </button>
 
                       <button
